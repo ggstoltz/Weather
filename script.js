@@ -1,83 +1,177 @@
-/*SEARCH BY USING A CITY NAME (e.g. athens) OR A COMMA-SEPARATED CITY NAME ALONG WITH THE COUNTRY CODE (e.g. athens,gr)*/
-const form = document.querySelector(".top-banner form");
-const input = document.querySelector(".top-banner input");
-const msg = document.querySelector(".top-banner .msg");
-const list = document.querySelector(".ajax-section .cities");
-/*PUT YOUR OWN KEY HERE - THIS MIGHT NOT WORK
-SUBSCRIBE HERE: https://home.openweathermap.org/users/sign_up*/
-const apiKey = "4d8fb5b93d4af21d66a2948710284366";
-
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  let inputVal = input.value;
-
-  //check if there's already a city
-  const listItems = list.querySelectorAll(".ajax-section .city");
-  const listItemsArray = Array.from(listItems);
-
-  if (listItemsArray.length > 0) {
-    const filteredArray = listItemsArray.filter((el) => {
-      let content = "";
-      //athens,gr
-      if (inputVal.includes(",")) {
-        //athens,grrrrrr->invalid country code, so we keep only the first part of inputVal
-        if (inputVal.split(",")[1].length > 2) {
-          inputVal = inputVal.split(",")[0];
-          content = el
-            .querySelector(".city-name span")
-            .textContent.toLowerCase();
-        } else {
-          content = el.querySelector(".city-name").dataset.name.toLowerCase();
-        }
-      } else {
-        //athens
-        content = el.querySelector(".city-name span").textContent.toLowerCase();
-      }
-      return content == inputVal.toLowerCase();
-    });
-
-    if (filteredArray.length > 0) {
-      msg.textContent = `You already know the weather for ${
-        filteredArray[0].querySelector(".city-name span").textContent
-      } ...otherwise be more specific by providing the country code as well 😉`;
-      form.reset();
-      input.focus();
-      return;
+//Declare a variable to store the searched city
+var city = "";
+// variable declaration
+var searchCity = $("#search-city");
+var searchButton = $("#search-button");
+var clearButton = $("#clear-history");
+var currentCity = $("#current-city");
+var currentTemperature = $("#temperature");
+var currentHumidty = $("#humidity");
+var currentWSpeed = $("#wind-speed");
+var currentUvindex = $("#uv-index");
+var sCity = [];
+// searches the city to see if it exists in the entries from the storage
+function find(c) {
+  for (var i = 0; i < sCity.length; i++) {
+    if (c.toUpperCase() === sCity[i]) {
+      return -1;
     }
   }
+  return 1;
+}
+//Set up the API key
+var APIKey = "12ed127a39813e4c107009a508db5dbc";
+// Display the curent and future weather to the user after grabing the city form the input text box.
+function displayWeather(event) {
+  event.preventDefault();
+  if (searchCity.val().trim() !== "") {
+    city = searchCity.val().trim();
+    currentWeather(city);
+  }
+}
+// Here we create the AJAX call
+function currentWeather(city) {
+  // Here we build the URL so we can get a data from server side.
+  var queryURL =
+    "https://api.openweathermap.org/data/2.5/weather?q=" +
+    city +
+    "&APPID=" +
+    APIKey;
+  $.ajax({
+    url: queryURL,
+    method: "GET",
+  }).then(function (response) {
+    // parse the response to display the current weather including the City name. the Date and the weather icon.
+    console.log(response);
+    //Dta object from server side Api for icon property.
+    var weathericon = response.weather[0].icon;
+    var iconurl =
+      "https://openweathermap.org/img/wn/" + weathericon + "@2x.png";
+    // The date format method is taken from the  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date
+    var date = new Date(response.dt * 1000).toLocaleDateString();
+    //parse the response for name of city and concanatig the date and icon.
+    $(currentCity).html(
+      response.name + "(" + date + ")" + "<img src=" + iconurl + ">"
+    );
+    // parse the response to display the current temperature.
+    // Convert the temp to fahrenheit
 
-  //ajax here
-  const url = `https://api.openweathermap.org/data/2.5/weather?q=${inputVal}&appid=${apiKey}&units=metric`;
+    var tempF = (response.main.temp - 273.15) * 1.8 + 32;
+    $(currentTemperature).html(tempF.toFixed(2) + "&#8457");
+    // Display the Humidity
+    $(currentHumidty).html(response.main.humidity + "%");
+    //Display Wind speed and convert to MPH
+    var ws = response.wind.speed;
+    var windsmph = (ws * 2.237).toFixed(1);
+    $(currentWSpeed).html(windsmph + "MPH");
+    // Display UVIndex.
+    //By Geographic coordinates method and using appid and coordinates as a parameter we are going build our uv query url inside the function below.
+    UVIndex(response.coord.lon, response.coord.lat);
+    forecast(response.id);
+    if (response.cod == 200) {
+      sCity = JSON.parse(localStorage.getItem("cityname"));
+      console.log(sCity);
+      if (sCity == null) {
+        sCity = [];
+        sCity.push(city.toUpperCase());
+        localStorage.setItem("cityname", JSON.stringify(sCity));
+        addToList(city);
+      } else {
+        if (find(city) > 0) {
+          sCity.push(city.toUpperCase());
+          localStorage.setItem("cityname", JSON.stringify(sCity));
+          addToList(city);
+        }
+      }
+    }
+  });
+}
+// This function returns the UVIindex response.
+function UVIndex(ln, lt) {
+  //lets build the url for uvindex.
+  var uvqURL =
+    "https://api.openweathermap.org/data/2.5/uvi?appid=" +
+    APIKey +
+    "&lat=" +
+    lt +
+    "&lon=" +
+    ln;
+  $.ajax({
+    url: uvqURL,
+    method: "GET",
+  }).then(function (response) {
+    $(currentUvindex).html(response.value);
+  });
+}
 
-  fetch(url)
-    .then((response) => response.json())
-    .then((data) => {
-      const { main, name, sys, weather } = data;
-      const icon = `https://s3-us-west-2.amazonaws.com/s.cdpn.io/162656/${weather[0]["icon"]}.svg`;
+// Here we display the 5 days forecast for the current city.
+function forecast(cityid) {
+  var dayover = false;
+  var queryforcastURL =
+    "https://api.openweathermap.org/data/2.5/forecast?id=" +
+    cityid +
+    "&appid=" +
+    APIKey;
+  $.ajax({
+    url: queryforcastURL,
+    method: "GET",
+  }).then(function (response) {
+    for (i = 0; i < 5; i++) {
+      var date = new Date(
+        response.list[(i + 1) * 8 - 1].dt * 1000
+      ).toLocaleDateString();
+      var iconcode = response.list[(i + 1) * 8 - 1].weather[0].icon;
+      var iconurl = "https://openweathermap.org/img/wn/" + iconcode + ".png";
+      var tempK = response.list[(i + 1) * 8 - 1].main.temp;
+      var tempF = ((tempK - 273.5) * 1.8 + 32).toFixed(2);
+      var humidity = response.list[(i + 1) * 8 - 1].main.humidity;
 
-      const li = document.createElement("li");
-      li.classList.add("city");
-      const markup = `
-        <h2 class="city-name" data-name="${name},${sys.country}">
-          <span>${name}</span>
-          <sup>${sys.country}</sup>
-        </h2>
-        <div class="city-temp">${Math.round(main.temp)}<sup>°C</sup></div>
-        <figure>
-          <img class="city-icon" src="${icon}" alt="${
-        weather[0]["description"]
-      }">
-          <figcaption>${weather[0]["description"]}</figcaption>
-        </figure>
-      `;
-      li.innerHTML = markup;
-      list.appendChild(li);
-    })
-    .catch(() => {
-      msg.textContent = "Please search for a valid city 😩";
-    });
+      $("#fDate" + i).html(date);
+      $("#fImg" + i).html("<img src=" + iconurl + ">");
+      $("#fTemp" + i).html(tempF + "&#8457");
+      $("#fHumidity" + i).html(humidity + "%");
+    }
+  });
+}
 
-  msg.textContent = "";
-  form.reset();
-  input.focus();
-});
+//Daynamically add the passed city on the search history
+function addToList(c) {
+  var listEl = $("<li>" + c.toUpperCase() + "</li>");
+  $(listEl).attr("class", "list-group-item");
+  $(listEl).attr("data-value", c.toUpperCase());
+  $(".list-group").append(listEl);
+}
+// display the past search again when the list group item is clicked in search history
+function invokePastSearch(event) {
+  var liEl = event.target;
+  if (event.target.matches("li")) {
+    city = liEl.textContent.trim();
+    currentWeather(city);
+  }
+}
+
+// render function
+function loadlastCity() {
+  $("ul").empty();
+  var sCity = JSON.parse(localStorage.getItem("cityname"));
+  if (sCity !== null) {
+    sCity = JSON.parse(localStorage.getItem("cityname"));
+    for (i = 0; i < sCity.length; i++) {
+      addToList(sCity[i]);
+    }
+    city = sCity[i - 1];
+    currentWeather(city);
+  }
+}
+//Clear the search history from the page
+function clearHistory(event) {
+  event.preventDefault();
+  sCity = [];
+  localStorage.removeItem("cityname");
+  document.location.reload();
+}
+//Click Handlers
+$("#search-button").on("click", displayWeather);
+$(document).on("click", invokePastSearch);
+$(window).on("load", loadlastCity);
+$("#clear-history").on("click", clearHistory);
