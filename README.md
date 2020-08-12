@@ -24,5 +24,5 @@ I created this code based on the homework prompt. Pieces of code I used online r
 
 For this project I ran into some issues with how to follow along with the resouce used and to make it fuction as my own. Focusing on the next project and topics in class and balencing this was a challenge as well.
 
-<!-- https://prosourcecode.com/weather-dashboard-in-javascript/ -->
-<!-- https://webdesign.tutsplus.com/tutorials/build-a-simple-weather-app-with-vanilla-javascript--cms-33893 -->
+https://prosourcecode.com/weather-dashboard-in-javascript/ -->
+https://webdesign.tutsplus.com/tutorials/build-a-simple-weather-app-with-vanilla-javascript--cms-33893 -->
